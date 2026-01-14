@@ -1,0 +1,26 @@
+@inherits LayoutComponentBase
+@using MudBlazor
+@using Microsoft.AspNetCore.Components.Web
+
+<MudThemeProvider IsDarkMode="@ThemeService.IsDarkMode" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudMainContent>
+        @Body
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        await ThemeService.InitializeAsync();
+        ThemeService.OnChange += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        ThemeService.OnChange -= StateHasChanged;
+    }
+}

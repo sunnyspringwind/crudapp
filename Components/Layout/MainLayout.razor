@@ -1,0 +1,134 @@
+@inherits LayoutComponentBase
+@implements IDisposable
+@using MudBlazor
+@using Microsoft.AspNetCore.Components.Web
+@using PersonalJournalApp.Components.Layout
+@inject IJournalService JournalService
+
+<MudThemeProvider Theme="_currentTheme" IsDarkMode="@ThemeService.IsDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="1">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
+            OnClick="@((e) => DrawerToggle())" />
+        <MudText Typo="Typo.h5" Class="ml-3">New Journal</MudText>
+        <MudSpacer />
+        <MudToggleIconButton Toggled="@ThemeService.IsDarkMode" ToggledChanged="@ThemeToggle"
+            Icon="@Icons.Material.Filled.LightMode" Color="@Color.Inherit" ToggledIcon="@Icons.Material.Filled.DarkMode"
+            ToggledColor="@Color.Inherit" />
+    </MudAppBar>
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="2">
+        <NavMenu />
+    </MudDrawer>
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.Large" Class="mt-4">
+            @if (_isInitialized)
+            {
+                <ErrorBoundary @ref="_errorBoundary">
+                    <ChildContent>
+                        @Body
+                    </ChildContent>
+                    <ErrorContent Context="ex">
+                        <MudAlert Severity="Severity.Error" Class="mt-4">
+                            An unhandled error occurred: @ex.Message
+                            <MudButton Color="Color.Inherit" OnClick="Recover">Recover</MudButton>
+                        </MudAlert>
+                    </ErrorContent>
+                </ErrorBoundary>
+            }
+            else if (_initError != null)
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-4">
+                    Initialization Error: @_initError
+                </MudAlert>
+            }
+            else
+            {
+                <div class="d-flex align-center justify-center" Style="height: 50vh;">
+                    <MudProgressCircular Color="Color.Primary" Indeterminate="true" Size="Size.Large" />
+                </div>
+            }
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+@code {
+    bool _drawerOpen = true;
+    bool _isInitialized = false;
+    string? _initError;
+    ErrorBoundary? _errorBoundary;
+
+    private MudTheme _currentTheme = new MudTheme()
+        {
+            PaletteLight = new PaletteLight()
+            {
+                Primary = "#512BD4",
+                AppbarBackground = "#9c84f0ff",
+            },
+            PaletteDark = new PaletteDark()
+            {
+                Primary = "#7C4DFF",
+            }
+        };
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await ThemeService.InitializeAsync();
+            await JournalService.InitializeAsync();
+            ThemeService.OnChange += StateHasChanged;
+        }
+        catch (Exception ex)
+        {
+            _initError = ex.Message;
+            Console.WriteLine($"Initialization Error: {ex.Message}");
+        }
+        finally
+        {
+            _isInitialized = true;
+            StateHasChanged();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            if (await SecurityService.IsPinSetAsync())
+            {
+                // Simple redirect if PIN is set
+                // In a production app, we'd use a more robust auth state provider
+                var uri = NavigationManager.ToAbsoluteUri(NavigationManager.Uri);
+                if (!uri.AbsolutePath.Contains("/login"))
+                {
+                    NavigationManager.NavigateTo("/login");
+                }
+            }
+        }
+    }
+
+    void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+    void ThemeToggle()
+    {
+        ThemeService.ToggleTheme();
+    }
+
+    void Recover()
+    {
+        _errorBoundary?.Recover();
+    }
+
+    public void Dispose()
+    {
+        ThemeService.OnChange -= StateHasChanged;
+    }
+}
