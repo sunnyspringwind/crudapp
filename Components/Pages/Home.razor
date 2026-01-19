@@ -1,0 +1,124 @@
+@page "/"
+@inject IJournalService JournalService
+@inject ISnackbar Snackbar
+
+<MudGrid>
+    <MudItem xs="12" md="8">
+        <MudPaper Class="pa-4">
+            <div class="d-flex align-center justify-space-between mb-4">
+                <MudText Typo="Typo.h4">@_selectedDate.ToString("MMMM dd, yyyy")</MudText>
+                <MudDatePicker Label="Change Date" Date="_selectedDate" DateChanged="OnDateChanged" />
+            </div>
+
+            <MudTextField T="string" Label="How was your day?" Variant="Variant.Outlined" Lines="15"
+                @bind-Value="_entry.Content" Placeholder="Start writing here (Markdown supported)..."
+                HelperText="Tip: You can use **bold**, *italic*, and other Markdown features." />
+
+            <div class="d-flex justify-end mt-4">
+                @if (_entry.Id > 0)
+                {
+                    <MudButton StartIcon="@Icons.Material.Filled.Delete" Color="Color.Error" OnClick="DeleteEntry"
+                        Class="mr-2">Delete</MudButton>
+                }
+                <MudButton StartIcon="@Icons.Material.Filled.Save" Variant="Variant.Filled" Color="Color.Primary"
+                    OnClick="SaveEntry">Save Entry</MudButton>
+            </div>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="4">
+        <MudPaper Class="pa-4 mb-4">
+            <MoodSelector PrimaryMoodId="_entry.PrimaryMoodId" PrimaryMoodIdChanged="@(id => _entry.PrimaryMoodId = id)"
+                SecondaryMoodIds="_secondaryMoodIds" SecondaryMoodIdsChanged="@(ids => _secondaryMoodIds = ids)" />
+        </MudPaper>
+
+        <MudPaper Class="pa-4">
+            <TagSelector SelectedTags="_selectedTags" SelectedTagsChanged="OnTagsChanged" />
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private DateTime _selectedDate = DateTime.Today;
+
+    private async Task OnDateChanged(DateTime? date)
+    {
+        if (date.HasValue)
+        {
+            await LoadEntry(date.Value);
+        }
+    }
+
+    private JournalEntry _entry = new();
+    private List<int> _secondaryMoodIds = new();
+    private List<Tag> _selectedTags = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadEntry(DateTime.Today);
+    }
+
+    private async Task LoadEntry(DateTime date)
+    {
+        _selectedDate = date;
+        var entry = await JournalService.GetEntryByDateAsync(date);
+        if (entry != null)
+        {
+            _entry = entry;
+            _secondaryMoodIds = entry.SecondaryMoods.Select(sm => sm.MoodId).ToList();
+            _selectedTags = entry.Tags.Select(et => et.Tag).ToList();
+        }
+        else
+        {
+            _entry = new JournalEntry { Date = date };
+            _secondaryMoodIds = new();
+            _selectedTags = new();
+        }
+        StateHasChanged();
+    }
+
+    private async Task SaveEntry()
+    {
+        if (string.IsNullOrWhiteSpace(_entry.Content))
+        {
+            Snackbar.Add("Entry content cannot be empty", Severity.Warning);
+            return;
+        }
+
+        if (_entry.PrimaryMoodId == 0)
+        {
+            Snackbar.Add("Please select a primary mood", Severity.Warning);
+            return;
+        }
+
+        try
+        {
+            await JournalService.SaveEntryAsync(_entry, _secondaryMoodIds, _selectedTags.Select(t => t.Id).ToList());
+            Snackbar.Add("Entry saved successfully!", Severity.Success);
+            await LoadEntry(_selectedDate);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error saving entry: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private async Task DeleteEntry()
+    {
+        try
+        {
+            await JournalService.DeleteEntryAsync(_entry.Id);
+            Snackbar.Add("Entry deleted", Severity.Info);
+            await LoadEntry(_selectedDate);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error deleting entry: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void OnTagsChanged(List<Tag> tags)
+    {
+        _selectedTags = tags;
+    }
+}

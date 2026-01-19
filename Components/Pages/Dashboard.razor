@@ -1,0 +1,128 @@
+@page "/dashboard"
+@inject IAnalyticsService AnalyticsService
+@inject IJournalService JournalService
+
+<MudText Typo="Typo.h4" Class="mb-4">Dashboard</MudText>
+
+<MudGrid>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4 d-flex flex-column align-center justify-center" Style="height:150px">
+            <MudText Typo="Typo.subtitle1">Current Streak</MudText>
+            <MudText Typo="Typo.h3" Color="Color.Primary">@_currentStreak days</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4 d-flex flex-column align-center justify-center" Style="height:150px">
+            <MudText Typo="Typo.subtitle1">Longest Streak</MudText>
+            <MudText Typo="Typo.h3" Color="Color.Secondary">@_longestStreak days</MudText>
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4 d-flex flex-column align-center justify-center" Style="height:150px">
+            <MudText Typo="Typo.subtitle1">Most Frequent Mood</MudText>
+            @if (_mostFrequentMood != null)
+            {
+                <MudText Typo="Typo.h4">@_mostFrequentMood.Emoji @_mostFrequentMood.Name</MudText>
+            }
+            else
+            {
+                <MudText Typo="Typo.subtitle2">No data yet</MudText>
+            }
+        </MudPaper>
+    </MudItem>
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4 d-flex flex-column align-center justify-center" Style="height:150px">
+            <MudText Typo="Typo.subtitle1">Total Entries</MudText>
+            <MudText Typo="Typo.h3">@_totalEntries</MudText>
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-2">Mood Distribution</MudText>
+            @if (_moodDistribution.Any())
+            {
+                <MudChart ChartType="ChartType.Pie" InputData="@_moodDistribution.Values.ToArray()"
+                    InputLabels="@_moodDistribution.Keys.Select(k => k.ToString()).ToArray()" Width="300px"
+                    Height="300px" />
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Info">Start journaling to see your mood distribution!</MudAlert>
+            }
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-2">Most Used Tags</MudText>
+            @if (_mostUsedTags.Any())
+            {
+                <MudChart ChartType="ChartType.Bar" ChartSeries="@_tagSeries" XAxisLabels="@_mostUsedTags.Keys.ToArray()"
+                    Width="100%" Height="300px" />
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Info">Use tags in your entries to see a breakdown here.</MudAlert>
+            }
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12">
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-2">Word Count Trends (Last 30 Days)</MudText>
+            @if (_wordCountTrends.Any())
+            {
+                <MudChart ChartType="ChartType.Line" ChartSeries="@_wordSeries"
+                    XAxisLabels="@_wordCountTrends.Select(t => t.Date.ToString("MM/dd")).ToArray()" Width="100%"
+                    Height="300px" />
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Info">Add more entries to see your writing trends.</MudAlert>
+            }
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private int _currentStreak;
+    private int _longestStreak;
+    private int _totalEntries;
+    private Mood? _mostFrequentMood;
+    private Dictionary<MoodCategory, double> _moodDistribution = new();
+    private Dictionary<string, int> _mostUsedTags = new();
+    private List<(DateTime Date, int WordCount)> _wordCountTrends = new();
+
+    private List<ChartSeries> _tagSeries = new();
+    private List<ChartSeries> _wordSeries = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _currentStreak = await AnalyticsService.GetCurrentStreakAsync();
+        _longestStreak = await AnalyticsService.GetLongestStreakAsync();
+        _mostFrequentMood = await AnalyticsService.GetMostFrequentMoodAsync();
+        _moodDistribution = await AnalyticsService.GetMoodDistributionAsync();
+        _mostUsedTags = await AnalyticsService.GetMostUsedTagsAsync();
+        _wordCountTrends = await AnalyticsService.GetWordCountTrendsAsync(DateTime.Today.AddDays(-30), DateTime.Today);
+
+        var entries = await JournalService.GetEntriesAsync();
+        _totalEntries = entries.Count;
+
+        if (_mostUsedTags.Any())
+        {
+            _tagSeries = new List<ChartSeries>
+{
+new ChartSeries { Name = "Uses", Data = _mostUsedTags.Values.Select(v => (double)v).ToArray() }
+};
+        }
+
+        if (_wordCountTrends.Any())
+        {
+            _wordSeries = new List<ChartSeries>
+{
+new ChartSeries { Name = "Words", Data = _wordCountTrends.Select(t => (double)t.WordCount).ToArray() }
+};
+        }
+    }
+}
