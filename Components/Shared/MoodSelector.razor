@@ -1,0 +1,75 @@
+@inject IJournalService JournalService
+
+<div class="d-flex flex-column gap-4">
+    <MudText Typo="Typo.h6">How are you feeling?</MudText>
+    
+    <div class="d-flex flex-wrap gap-2">
+        @foreach (var mood in _allMoods)
+        {
+            <MudChip T="int"
+                     Variant="@(PrimaryMoodId == mood.Id ? Variant.Filled : Variant.Outlined)"
+                     Color="@GetMoodColor(mood.Category)"
+                     OnClick="@(() => OnPrimaryMoodSelected(mood.Id))"
+                     Value="@mood.Id">
+                @mood.Emoji @mood.Name
+            </MudChip>
+        }
+    </div>
+
+    @if (PrimaryMoodId > 0)
+    {
+        <MudText Typo="Typo.subtitle1">Secondary Moods (Optional, max 2)</MudText>
+        <div class="d-flex flex-wrap gap-2">
+            @foreach (var mood in _allMoods.Where(m => m.Id != PrimaryMoodId))
+            {
+                <MudChip T="int"
+                         Variant="@(SecondaryMoodIds.Contains(mood.Id) ? Variant.Filled : Variant.Outlined)"
+                         Color="@GetMoodColor(mood.Category)"
+                         OnClick="@(() => ToggleSecondaryMood(mood.Id))"
+                         Disabled="@(!SecondaryMoodIds.Contains(mood.Id) && SecondaryMoodIds.Count >= 2)"
+                         Value="@mood.Id">
+                    @mood.Emoji @mood.Name
+                </MudChip>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int PrimaryMoodId { get; set; }
+    [Parameter] public EventCallback<int> PrimaryMoodIdChanged { get; set; }
+    
+    [Parameter] public List<int> SecondaryMoodIds { get; set; } = new();
+    [Parameter] public EventCallback<List<int>> SecondaryMoodIdsChanged { get; set; }
+
+    private List<Mood> _allMoods = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _allMoods = await JournalService.GetAllMoodsAsync();
+    }
+
+    private async Task OnPrimaryMoodSelected(int id)
+    {
+        PrimaryMoodId = id;
+        await PrimaryMoodIdChanged.InvokeAsync(id);
+    }
+
+    private async Task ToggleSecondaryMood(int id)
+    {
+        if (SecondaryMoodIds.Contains(id))
+            SecondaryMoodIds.Remove(id);
+        else if (SecondaryMoodIds.Count < 2)
+            SecondaryMoodIds.Add(id);
+            
+        await SecondaryMoodIdsChanged.InvokeAsync(SecondaryMoodIds);
+    }
+
+    private Color GetMoodColor(MoodCategory category) => category switch
+    {
+        MoodCategory.Positive => Color.Success,
+        MoodCategory.Neutral => Color.Info,
+        MoodCategory.Negative => Color.Error,
+        _ => Color.Default
+    };
+}

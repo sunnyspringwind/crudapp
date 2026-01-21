@@ -1,0 +1,117 @@
+@page "/timeline"
+@inject IJournalService JournalService
+@inject IExportService ExportService
+@inject IJSRuntime JSRuntime
+@inject ISnackbar Snackbar
+
+<div class="d-flex align-center justify-space-between mb-4">
+    <MudText Typo="Typo.h4">Timeline</MudText>
+    <MudButton StartIcon="@Icons.Material.Filled.PictureAsPdf" Variant="Variant.Filled" Color="Color.Secondary" OnClick="ExportToPdf">Export to PDF</MudButton>
+</div>
+
+<MudPaper Class="pa-4 mb-4">
+    <MudGrid>
+        <MudItem xs="12" md="4">
+            <MudTextField @bind-Value="_searchText" Placeholder="Search entries..." Adornment="Adornment.Start" AdornmentIcon="@Icons.Material.Filled.Search" OnDebounceIntervalElapsed="Search" DebounceInterval="500" />
+        </MudItem>
+        <MudItem xs="12" md="4">
+            <MudDateRangePicker Label="Filter by Date Range" @bind-DateRange="_dateRange" />
+        </MudItem>
+        <MudItem xs="12" md="4" Class="d-flex align-end">
+            <MudButton Variant="Variant.Outlined" Color="Color.Primary" OnClick="Search" FullWidth="true">Apply Filters</MudButton>
+        </MudItem>
+    </MudGrid>
+</MudPaper>
+
+@if (_entries == null)
+{
+    <MudProgressCircular Color="Color.Primary" Indeterminate="true" />
+}
+else if (!_entries.Any())
+{
+    <MudAlert Severity="Severity.Info">No entries found matching your criteria.</MudAlert>
+}
+else
+{
+    <div class="d-flex flex-column gap-4">
+        @foreach (var entry in _entries)
+        {
+            <MudCard>
+                <MudCardHeader>
+                    <CardHeaderAvatar>
+                        <MudAvatar Color="@GetMoodColor(entry.PrimaryMood?.Category ?? MoodCategory.Neutral)">@entry.PrimaryMood?.Emoji</MudAvatar>
+                    </CardHeaderAvatar>
+                    <CardHeaderContent>
+                        <MudText Typo="Typo.h6">@entry.Date.ToString("MMMM dd, yyyy")</MudText>
+                        <MudText Typo="Typo.body2">@entry.PrimaryMood?.Name</MudText>
+                    </CardHeaderContent>
+                    <CardHeaderActions>
+                        <MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Default" OnClick="@(() => EditEntry(entry.Date))" />
+                    </CardHeaderActions>
+                </MudCardHeader>
+                <MudCardContent>
+                    <MudText Typo="Typo.body1" Style="white-space: pre-wrap">@entry.Content</MudText>
+                    <div class="d-flex flex-wrap gap-1 mt-3">
+                        @foreach (var tag in entry.Tags)
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@tag.Tag.Name</MudChip>
+                        }
+                    </div>
+                </MudCardContent>
+            </MudCard>
+        }
+    </div>
+}
+
+@code {
+    private List<JournalEntry>? _entries;
+    private string _searchText = "";
+    private DateRange _dateRange = new DateRange(DateTime.Today.AddDays(-30), DateTime.Today);
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Search();
+    }
+
+    private async Task Search()
+    {
+        _entries = await JournalService.GetEntriesAsync(
+            startDate: _dateRange.Start,
+            endDate: _dateRange.End,
+            searchText: _searchText
+        );
+    }
+
+    private void EditEntry(DateTime date)
+    {
+        NavigationManager.NavigateTo($"/#");
+        // In a real app we'd pass state or use a service to set the selected date
+    }
+
+    private async Task ExportToPdf()
+    {
+        if (_entries == null || !_entries.Any()) return;
+
+        try
+        {
+            var pdfBytes = await ExportService.ExportToPdfAsync(_entries);
+            var fileName = $"Journal_{_dateRange.Start:yyyyMMdd}-{_dateRange.End:yyyyMMdd}.pdf";
+            
+            // Invoke JS to download
+            await JSRuntime.InvokeVoidAsync("downloadFile", fileName, Convert.ToBase64String(pdfBytes));
+            Snackbar.Add("PDF exported successfully", Severity.Success);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private Color GetMoodColor(MoodCategory category) => category switch
+    {
+        MoodCategory.Positive => Color.Success,
+        MoodCategory.Neutral => Color.Info,
+        MoodCategory.Negative => Color.Error,
+        _ => Color.Default
+    };
+}

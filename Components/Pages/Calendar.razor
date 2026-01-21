@@ -1,0 +1,62 @@
+@page "/calendar"
+@inject IJournalService JournalService
+
+<MudText Typo="Typo.h4" Class="mb-4">Journal Calendar</MudText>
+
+<MudPaper Class="pa-4">
+    <MudDatePicker Date="_selectedDate" 
+                   DateChanged="OnDateChanged"
+                   PickerVariant="PickerVariant.Static" />
+    
+    @if (_selectedEntry != null)
+    {
+        <MudCard Class="mt-4">
+            <MudCardHeader>
+                <CardHeaderAvatar>
+                    <MudAvatar Color="Color.Primary">@_selectedEntry.PrimaryMood?.Emoji</MudAvatar>
+                </CardHeaderAvatar>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">@_selectedDate?.ToString("D")</MudText>
+                    <MudText Typo="Typo.body2">@_selectedEntry.PrimaryMood?.Name</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                <MudText Typo="Typo.body1">@_selectedEntry.Content</MudText>
+            </MudCardContent>
+            <MudCardActions>
+                <MudButton Variant="Variant.Text" Color="Color.Primary" OnClick="GoToEntry">Edit Entry</MudButton>
+            </MudCardActions>
+        </MudCard>
+    }
+    else
+    {
+        <MudAlert Severity="Severity.Info" Class="mt-4">No entry for this date.</MudAlert>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" Class="mt-2" OnClick="GoToEntry">Create Entry</MudButton>
+    }
+</MudPaper>
+
+@code {
+    private DateTime? _selectedDate = DateTime.Today;
+    private JournalEntry? _selectedEntry;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadSelectedEntry();
+    }
+
+    private async Task OnDateChanged(DateTime? date)
+    {
+        _selectedDate = date ?? DateTime.Today;
+        await LoadSelectedEntry();
+    }
+
+    private async Task LoadSelectedEntry()
+    {
+        _selectedEntry = await JournalService.GetEntryByDateAsync(_selectedDate ?? DateTime.Today);
+    }
+
+    private void GoToEntry()
+    {
+        NavigationManager.NavigateTo($"/");
+    }
+}

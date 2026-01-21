@@ -1,0 +1,54 @@
+@inject IJournalService JournalService
+
+<div class="d-flex flex-column gap-2">
+    <MudText Typo="Typo.h6">Tags</MudText>
+    <MudAutocomplete T="Tag"
+                     Label="Add Tag"
+                     SearchFunc="@SearchTags"
+                     ToStringFunc="@(t => t?.Name ?? string.Empty)"
+                     ValueChanged="@OnTagSelected"
+                     ResetValueOnEmptyText="true"
+                     CoerceText="true" />
+    
+    <div class="d-flex flex-wrap gap-2 mt-2">
+        @foreach (var tag in SelectedTags)
+        {
+            <MudChip T="Tag" OnClose="@(() => RemoveTag(tag))" Color="Color.Primary" Variant="Variant.Filled">
+                @tag.Name
+            </MudChip>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public List<Tag> SelectedTags { get; set; } = new();
+    [Parameter] public EventCallback<List<Tag>> SelectedTagsChanged { get; set; }
+
+    private List<Tag> _allTags = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _allTags = await JournalService.GetAllTagsAsync();
+    }
+
+    private Task<IEnumerable<Tag>> SearchTags(string value, CancellationToken token)
+    {
+        if (string.IsNullOrEmpty(value)) return Task.FromResult<IEnumerable<Tag>>(_allTags);
+        return Task.FromResult(_allTags.Where(t => t.Name.Contains(value, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private async Task OnTagSelected(Tag tag)
+    {
+        if (tag != null && !SelectedTags.Any(t => t.Id == tag.Id))
+        {
+            SelectedTags.Add(tag);
+            await SelectedTagsChanged.InvokeAsync(SelectedTags);
+        }
+    }
+
+    private async Task RemoveTag(Tag tag)
+    {
+        SelectedTags.Remove(tag);
+        await SelectedTagsChanged.InvokeAsync(SelectedTags);
+    }
+}
