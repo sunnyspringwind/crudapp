@@ -1,0 +1,55 @@
+@page "/login"
+@layout PersonalJournalApp.Components.Layout.EmptyLayout
+@using MudBlazor
+@inject ISnackbar Snackbar
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center justify-center" Style="height: 100vh;">
+    <MudPaper Class="pa-8 d-flex flex-column align-center" Elevation="4">
+        <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Large" Color="Color.Primary" Class="mb-4" />
+        <MudText Typo="Typo.h4" Class="mb-2">Secure Journal</MudText>
+        <MudText Typo="Typo.body2" Class="mb-6">Enter your PIN to unlock</MudText>
+
+        <MudTextField T="string"
+                      @bind-Value="_pin"
+                      Label="PIN"
+                      Variant="Variant.Outlined"
+                      InputType="InputType.Password"
+                      OnKeyDown="@HandleKeyDown"
+                      Immediate="true"
+                      AutoFocus="true"
+                      MaxLength="6"
+                      Style="text-align: center; font-size: 2rem; letter-spacing: 0.5rem;" />
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   FullWidth="true"
+                   Size="Size.Large"
+                   Class="mt-6"
+                   OnClick="Unlock">Unlock</MudButton>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private string _pin = "";
+
+    private async Task Unlock()
+    {
+        if (await SecurityService.VerifyPinAsync(_pin))
+        {
+            NavigationManager.NavigateTo("/");
+        }
+        else
+        {
+            Snackbar.Add("Incorrect PIN", Severity.Error);
+            _pin = "";
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await Unlock();
+        }
+    }
+}
