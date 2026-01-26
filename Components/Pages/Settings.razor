@@ -1,0 +1,76 @@
+@page "/settings"
+@inject ISnackbar Snackbar
+
+<MudText Typo="Typo.h4" Class="mb-4">Settings</MudText>
+
+<MudGrid>
+    <MudItem xs="12" md="6">
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-4">Security</MudText>
+            
+            @if (_isPinSet)
+            {
+                <MudAlert Severity="Severity.Success" Class="mb-4">PIN Protection is Active</MudAlert>
+                <MudButton Variant="Variant.Filled" Color="Color.Error" OnClick="ClearPin">Clear PIN</MudButton>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Warning" Class="mb-4">Your journal is currently unprotected.</MudAlert>
+                <MudTextField @bind-Value="_newPin" Label="Set New PIN" Variant="Variant.Outlined" InputType="InputType.Password" Class="mb-4" />
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="SetPin">Set PIN</MudButton>
+            }
+        </MudPaper>
+    </MudItem>
+
+    <MudItem xs="12" md="6">
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-4">Appearance</MudText>
+            <MudSwitch T="bool" Value="@ThemeService.IsDarkMode" ValueChanged="@ThemeToggle" Label="Dark Mode" Color="Color.Primary" />
+            <MudText Typo="Typo.body2" Class="mt-2">Personalize your journaling experience with dark or light themes.</MudText>
+        </MudPaper>
+    </MudItem>
+    
+    <MudItem xs="12">
+        <MudPaper Class="pa-4">
+            <MudText Typo="Typo.h6" Class="mb-4">About Personal Journal</MudText>
+            <MudText Typo="Typo.body1">Version 1.0.0</MudText>
+            <MudText Typo="Typo.body2">A secure, local-first journaling application built with .NET MAUI and Blazor.</MudText>
+        </MudPaper>
+    </MudItem>
+</MudGrid>
+
+@code {
+    private bool _isPinSet;
+    private string _newPin = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isPinSet = await SecurityService.IsPinSetAsync();
+    }
+
+    private void ThemeToggle(bool value)
+    {
+        ThemeService.ToggleTheme();
+    }
+
+    private async Task SetPin()
+    {
+        if (string.IsNullOrWhiteSpace(_newPin) || _newPin.Length < 4)
+        {
+            Snackbar.Add("PIN must be at least 4 digits", Severity.Error);
+            return;
+        }
+
+        await SecurityService.SetPinAsync(_newPin);
+        _isPinSet = true;
+        _newPin = "";
+        Snackbar.Add("PIN set successfully!", Severity.Success);
+    }
+
+    private async Task ClearPin()
+    {
+        await SecurityService.ClearPinAsync();
+        _isPinSet = false;
+        Snackbar.Add("PIN protection removed", Severity.Info);
+    }
+}
